@@ -1,37 +1,38 @@
 package algorithm
 
-import "sync"
+import (
+	"sync"
+)
 
-func FloydWarshall(distances, pathVertex *[][]uint16, vertexCount uint16) {
-	for k := uint16(0); k < vertexCount; k++ {
-		for i := uint16(0); i < vertexCount; i++ {
-			for j := uint16(0); j < vertexCount; j++ {
-				if (*distances)[i][k] != ^uint16(0) && (*distances)[k][j] != ^uint16(0) {
-					if (*distances)[i][j] > (*distances)[i][k]+(*distances)[k][j] {
-						(*distances)[i][j] = (*distances)[i][k] + (*distances)[k][j]
-						(*pathVertex)[i][j] = (*pathVertex)[k][j]
-					}
-				}
-			}
+func innerLoop(i, k, vertexCount uint16, distances, pathVertex *[][]uint16) {
+	for j := uint16(0); j < vertexCount; j++ {
+		if (*distances)[i][k] != ^uint16(0) && (*distances)[k][j] != ^uint16(0) && (*distances)[i][j] > (*distances)[i][k]+(*distances)[k][j] {
+			(*distances)[i][j] = (*distances)[i][k] + (*distances)[k][j]
+			(*pathVertex)[i][j] = (*pathVertex)[k][j]
 		}
 	}
 }
 
-func FloydWarshallParallel(distances, pathVertex *[][]uint16, vertexCount uint16) {
+func FloydWarshall(distances, pathVertex *[][]uint16, vertexCount uint16) {
+	for k := uint16(0); k < vertexCount; k++ {
+		for i := uint16(0); i < vertexCount; i++ {
+			innerLoop(i, k, vertexCount, distances, pathVertex)
+		}
+	}
+}
+
+func FloydWarshallParallel(distances, pathVertex *[][]uint16, vertexCount uint16, numThreads int) {
 	for k := uint16(0); k < vertexCount; k++ {
 		var wg sync.WaitGroup
+		sem := make(chan struct{}, numThreads)
+
 		for i := uint16(0); i < vertexCount; i++ {
+			sem <- struct{}{}
 			wg.Add(1)
 			go func(i uint16) {
 				defer wg.Done()
-				for j := uint16(0); j < vertexCount; j++ {
-					if (*distances)[i][k] != ^uint16(0) && (*distances)[k][j] != ^uint16(0) {
-						if (*distances)[i][j] > (*distances)[i][k]+(*distances)[k][j] {
-							(*distances)[i][j] = (*distances)[i][k] + (*distances)[k][j]
-							(*pathVertex)[i][j] = (*pathVertex)[k][j]
-						}
-					}
-				}
+				innerLoop(i, k, vertexCount, distances, pathVertex)
+				<-sem
 			}(i)
 		}
 		wg.Wait()

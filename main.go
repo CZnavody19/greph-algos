@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/CZnavody19/graph-algorithms/algorithm"
 	"github.com/CZnavody19/graph-algorithms/database"
@@ -89,28 +90,55 @@ func interactive(distances, pathVertex *[][]uint16, numberOfVertices uint16) {
 }
 
 func main() {
+	info := false
+
+	if len(os.Args) < 3 || len(os.Args) > 4 {
+		fmt.Println("Usage: ./graph-algorithms <\"example\" | postgres connection string> <number of threads> <optional \"info\">")
+		os.Exit(1)
+	}
+
+	numThreads, err := strconv.Atoi(os.Args[2])
+	if err != nil {
+		fmt.Printf("Invalid number of threads: %s\n", os.Args[2])
+		os.Exit(1)
+	}
+
+	if len(os.Args) == 4 && os.Args[3] == "info" {
+		info = true
+	}
+
 	var graph [][]uint16
 	var size uint16
 
-	if len(os.Args) > 1 {
-		graph, size = getGraphFromDB(os.Args[1])
-	} else {
+	if os.Args[1] == "example" {
 		graph, size = makeSampleGraph()
+	} else {
+		graph, size = getGraphFromDB(os.Args[1])
 	}
 
-	// utils.PrintMatrix(graph, "Input graph")
+	if info {
+		utils.PrintMatrix(graph, "Input graph")
+	}
 
 	fmt.Println("Initializing matrices...")
 	distances, pathVertex := algorithm.InitializeMatrices(&graph, size)
 
-	// utils.PrintMatrix(*distances, "Initialized distances")
-	// utils.PrintMatrix(*pathVertex, "Initialized path vertex")
+	if info {
+		utils.PrintMatrix(*distances, "Initialized distances")
+		utils.PrintMatrix(*pathVertex, "Initialized path vertex")
+	}
 
 	fmt.Println("Running Floyd-Warshall algorithm...")
-	algorithm.FloydWarshallParallel(distances, pathVertex, size)
+	if numThreads > 1 {
+		algorithm.FloydWarshallParallel(distances, pathVertex, size, numThreads)
+	} else {
+		algorithm.FloydWarshall(distances, pathVertex, size)
+	}
 
-	// utils.PrintMatrix(*distances, "Post algo distances")
-	// utils.PrintMatrix(*pathVertex, "Post algo path vertex")
+	if info {
+		utils.PrintMatrix(*distances, "Post algo distances")
+		utils.PrintMatrix(*pathVertex, "Post algo path vertex")
+	}
 
 	interactive(distances, pathVertex, size)
 }
